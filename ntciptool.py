@@ -3,6 +3,10 @@
 
 Protocol : SNMP v1/v2c (NTCIP 1203)
 Features : Brightness control (dmsIllumControl)
+
+Requires: pysnmp-lextudio>=5.0,<6  (pip install pysnmp-lextudio)
+          This is the maintained fork of pysnmp 4.x that keeps the classic
+          hlapi interface.  The newer pysnmp 7.x has an incompatible API.
 """
 
 import sys
@@ -16,13 +20,20 @@ try:
         ContextData, ObjectType, ObjectIdentity, Integer32
     )
 except ImportError:
-    print("ERROR: pysnmp is required.  Install with:  pip install pysnmp", file=sys.stderr)
+    print(
+        "ERROR: pysnmp-lextudio is required.\n"
+        "       pip install pysnmp-lextudio\n"
+        "\n"
+        "NOTE: The newer 'pysnmp' package (v7+) has an incompatible API.\n"
+        "      Use 'pysnmp-lextudio' instead.",
+        file=sys.stderr
+    )
     sys.exit(1)
 
 # ---------------------------------------------------------------------------
 # NTCIP 1203 OIDs
 # ---------------------------------------------------------------------------
-# dmsIllumControl  – controls the brightness source
+# dmsIllumControl  - controls the brightness source
 # OBJECT-TYPE SYNTAX INTEGER { other(1), photocell(2), timer(3),
 #                               manual(4), manualDirect(5), manualIndexed(6) }
 OID_ILLUM_CONTROL = "1.3.6.1.4.1.1206.4.2.3.7.1"
@@ -52,7 +63,7 @@ def snmp_get(host: str, oid: str, community: str = DEFAULT_COMMUNITY_READ,
     error_indication, error_status, error_index, var_binds = next(
         getCmd(
             SnmpEngine(),
-            CommunityData(community, mpModel=1),          # mpModel=1 → SNMPv2c
+            CommunityData(community, mpModel=1),          # mpModel=1 -> SNMPv2c
             UdpTransportTarget((host, port), timeout=3, retries=2),
             ContextData(),
             ObjectType(ObjectIdentity(oid)),
@@ -122,16 +133,16 @@ def cmd_brightness(hosts: list[str], args: argparse.Namespace) -> None:
         print(f"\n{'─' * 60}")
         print(f"  Host : {host}")
 
-        # ── READ CURRENT VALUE ────────────────────────────────────────────
+        # -- READ CURRENT VALUE -----------------------------------------------
         before = snmp_get(host, OID_ILLUM_CONTROL,
                           community=args.read_community, port=args.port)
         print(f"  Brightness (before) : {brightness_mode_label(before)} [{before}]")
 
         if new_mode is None:
-            # Status-only – nothing more to do
+            # Status-only - nothing more to do
             continue
 
-        # ── WRITE NEW VALUE ───────────────────────────────────────────────
+        # -- WRITE NEW VALUE --------------------------------------------------
         print(f"  Setting brightness  : {brightness_mode_label(new_mode)} [{new_mode}]")
         ok = snmp_set(host, OID_ILLUM_CONTROL, new_mode,
                       community=args.write_community, port=args.port)
@@ -139,15 +150,15 @@ def cmd_brightness(hosts: list[str], args: argparse.Namespace) -> None:
             print("  Result              : FAILED")
             continue
 
-        # ── VERIFY NEW VALUE ──────────────────────────────────────────────
+        # -- VERIFY NEW VALUE -------------------------------------------------
         after = snmp_get(host, OID_ILLUM_CONTROL,
                          community=args.read_community, port=args.port)
         print(f"  Brightness (after)  : {brightness_mode_label(after)} [{after}]")
 
         if after == new_mode:
-            print("  Result              : OK ✓")
+            print("  Result              : OK v")
         else:
-            print(f"  Result              : MISMATCH – expected {new_mode}, got {after}")
+            print(f"  Result              : MISMATCH - expected {new_mode}, got {after}")
 
     print(f"\n{'─' * 60}")
 
@@ -178,7 +189,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # ── global options ────────────────────────────────────────────────────
+    # -- global options -------------------------------------------------------
     parser.add_argument("-p", "--port",
                         type=int, default=DEFAULT_PORT,
                         metavar="PORT",
@@ -194,19 +205,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", title="commands")
 
-    # ── brightness sub-command ────────────────────────────────────────────
+    # -- brightness sub-command -----------------------------------------------
     brightness_parser = subparsers.add_parser(
         "brightness",
         help="Get or set dmsIllumControl (brightness source)",
         description=(
             "Read or change the brightness control mode of one or more signs.\n\n"
             "Brightness modes (dmsIllumControl):\n"
-            "  other         (1) – vendor-specific behaviour\n"
-            "  photocell     (2) – automatic via photocell sensor\n"
-            "  timer         (3) – scheduled timer\n"
-            "  manual        (4) – manual indexed level via dmsIllumManLevel\n"
-            "  manualDirect  (5) – direct light output percentage\n"
-            "  manualIndexed (6) – indexed via separate control table\n"
+            "  other         (1) - vendor-specific behaviour\n"
+            "  photocell     (2) - automatic via photocell sensor\n"
+            "  timer         (3) - scheduled timer\n"
+            "  manual        (4) - manual indexed level via dmsIllumManLevel\n"
+            "  manualDirect  (5) - direct light output percentage\n"
+            "  manualIndexed (6) - indexed via separate control table\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
