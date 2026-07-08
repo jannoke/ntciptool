@@ -5,6 +5,7 @@ Protocol : SNMP v1/v2c (NTCIP 1203)
 Features : Brightness control (dmsIllumControl)
 
 Requires: pysnmp-lextudio>=5.0,<6  (pip install pysnmp-lextudio)
+          pyasn1>=0.4.8,<0.6        (pip install "pyasn1>=0.4.8,<0.6")
           This is the maintained fork of pysnmp 4.x that keeps the classic
           hlapi interface.  The newer pysnmp 7.x has an incompatible API.
 """
@@ -57,6 +58,40 @@ DEFAULT_PORT            = 161
 # SNMP helpers
 # ---------------------------------------------------------------------------
 
+def _val_to_int(val) -> Optional[int]:
+    """Safely convert an SNMP value to int.
+
+    Handles Integer, OctetString, and anything else pysnmp may return.
+    Returns None if the value is empty or unparseable.
+    """
+    # Already a plain Python int (shouldn't happen via hlapi, but be safe)
+    if isinstance(val, int):
+        return val
+
+    raw = val.prettyPrint()          # always returns a str
+    raw = raw.strip()
+
+    # Empty response (uninitialised OID on some signs)
+    if not raw or raw in ("", "0x"):
+        return None
+
+    # Hex string e.g. "0x04"
+    if raw.startswith("0x") or raw.startswith("0X"):
+        try:
+            return int(raw, 16)
+        except ValueError:
+            pass
+
+    # Plain decimal
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+
+    print(f"  [WARN] Could not parse SNMP value: {raw!r}", file=sys.stderr)
+    return None
+
+
 def snmp_get(host: str, oid: str, community: str = DEFAULT_COMMUNITY_READ,
              port: int = DEFAULT_PORT) -> Optional[int]:
     """Return the integer value of *oid* from *host*, or None on error."""
@@ -78,7 +113,7 @@ def snmp_get(host: str, oid: str, community: str = DEFAULT_COMMUNITY_READ,
               file=sys.stderr)
         return None
     for _, val in var_binds:
-        return int(val)
+        return _val_to_int(val)
     return None
 
 
@@ -183,8 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  # Set brightness to photocell on one sign\n"
             "  ntciptool brightness --mode photocell 192.168.1.10\n\n"
             "  # Set brightness to manual on three signs with custom communities\n"
-            "  ntciptool brightness --mode manual \\\n"
-            "           --write-community admin \\\n"
+            "  ntciptool --write-community admin brightness --mode manual \\\n"
             "           192.168.1.10 192.168.1.11 192.168.1.12\n"
         ),
     )
